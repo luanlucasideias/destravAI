@@ -39,7 +39,7 @@ function GabaritoView() {
   const [mostrarCorrecao, setMostrarCorrecao] = useState(false)
 
   // Simulação de gabarito correto
-  const gabaritoCorreto = {
+  const gabaritoCorreto: Record<number, string> = {
     1: "b",
     2: "a",
     3: "c",
