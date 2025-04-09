@@ -7,8 +7,31 @@ import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ArrowUp, TrendingUp } from "lucide-react"
-import { BarChart, LineChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Bar, Line, ResponsiveContainer } from "recharts"
+import { BarChart, LineChart, CartesianGrid, XAxis, YAxis, Tooltip, Legend, Bar, Line } from "recharts"
+import { ChartContainer, ChartTooltipContent } from "@/components/ui/chart"
 import { CheckCircle } from "lucide-react"
+
+// Adicionar imports necessários para o dropdown
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import { LogOut, Settings, User } from "lucide-react"
 
 export default function Progresso() {
   return (
@@ -36,9 +59,56 @@ export default function Progresso() {
           </nav>
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium">Olá, Maria</span>
-            <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium">
-              M
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium cursor-pointer hover:bg-primary/20 transition-colors">
+                  M
+                </div>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/perfil" className="cursor-pointer flex items-center">
+                    <User className="mr-2 h-4 w-4" />
+                    <span>Perfil</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/configuracoes" className="cursor-pointer flex items-center">
+                    <Settings className="mr-2 h-4 w-4" />
+                    <span>Configurações</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <DropdownMenuItem
+                      onSelect={(e) => e.preventDefault()}
+                      className="cursor-pointer text-red-600 focus:text-red-600"
+                    >
+                      <LogOut className="mr-2 h-4 w-4" />
+                      <span>Sair</span>
+                    </DropdownMenuItem>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Deseja realmente sair?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Você será desconectado da sua conta. Para continuar estudando, será necessário fazer login
+                        novamente.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction asChild>
+                        <Link href="/login">Sair</Link>
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </header>
@@ -139,7 +209,18 @@ export default function Progresso() {
                       </CardHeader>
                       <CardContent className="p-0 overflow-hidden">
                         <div className="h-[220px] w-full px-2">
-                          <ResponsiveContainer>
+                          <ChartContainer
+                            config={{
+                              acertos: {
+                                label: "Taxa de Acerto",
+                                color: "hsl(var(--chart-1))",
+                              },
+                              questoes: {
+                                label: "Questões Respondidas",
+                                color: "hsl(var(--chart-2))",
+                              },
+                            }}
+                          >
                             <BarChart
                               data={[
                                 { semana: "Sem 1", acertos: 62, questoes: 25 },
@@ -179,17 +260,17 @@ export default function Progresso() {
                                 width={25}
                                 tick={{ fontSize: 11 }}
                               />
-                              <Tooltip />
+                              <Tooltip content={<ChartTooltipContent />} cursor={false} />
                               <Legend wrapperStyle={{ paddingTop: "5px", fontSize: "11px" }} height={20} iconSize={8} />
-                              <Bar dataKey="acertos" yAxisId="left" fill="hsl(var(--chart-1))" radius={[3, 3, 0, 0]} />
+                              <Bar dataKey="acertos" yAxisId="left" fill="var(--color-acertos)" radius={[3, 3, 0, 0]} />
                               <Bar
                                 dataKey="questoes"
                                 yAxisId="right"
-                                fill="hsl(var(--chart-2))"
+                                fill="var(--color-questoes)"
                                 radius={[3, 3, 0, 0]}
                               />
                             </BarChart>
-                          </ResponsiveContainer>
+                          </ChartContainer>
                         </div>
                       </CardContent>
                     </Card>
@@ -203,7 +284,26 @@ export default function Progresso() {
                       </CardHeader>
                       <CardContent className="p-0 overflow-hidden">
                         <div className="h-[220px] w-full px-2">
-                          <ResponsiveContainer>
+                          <ChartContainer
+                            config={{
+                              "Geometria Analítica": {
+                                label: "Geo. Analítica",
+                                color: "hsl(var(--chart-1))",
+                              },
+                              Trigonometria: {
+                                label: "Trigonometria",
+                                color: "hsl(var(--chart-2))",
+                              },
+                              "Funções Exponenciais": {
+                                label: "Funç. Exponenciais",
+                                color: "hsl(var(--chart-3))",
+                              },
+                              "Geometria Plana": {
+                                label: "Geo. Plana",
+                                color: "hsl(var(--chart-4))",
+                              },
+                            }}
+                          >
                             <LineChart
                               data={[
                                 {
@@ -269,12 +369,12 @@ export default function Progresso() {
                                 domain={[40, 90]}
                                 ticks={[40, 50, 60, 70, 80, 90]}
                               />
-                              <Tooltip />
+                              <Tooltip content={<ChartTooltipContent />} cursor={false} />
                               <Legend wrapperStyle={{ paddingTop: "5px", fontSize: "11px" }} height={20} iconSize={8} />
                               <Line
                                 type="monotone"
                                 dataKey="Geometria Analítica"
-                                stroke="hsl(var(--chart-1))"
+                                stroke="var(--color-Geometria Analítica)"
                                 strokeWidth={2}
                                 dot={{ r: 3 }}
                                 activeDot={{ r: 5 }}
@@ -282,7 +382,7 @@ export default function Progresso() {
                               <Line
                                 type="monotone"
                                 dataKey="Trigonometria"
-                                stroke="hsl(var(--chart-2))"
+                                stroke="var(--color-Trigonometria)"
                                 strokeWidth={2}
                                 dot={{ r: 3 }}
                                 activeDot={{ r: 5 }}
@@ -290,7 +390,7 @@ export default function Progresso() {
                               <Line
                                 type="monotone"
                                 dataKey="Funções Exponenciais"
-                                stroke="hsl(var(--chart-3))"
+                                stroke="var(--color-Funções Exponenciais)"
                                 strokeWidth={2}
                                 dot={{ r: 3 }}
                                 activeDot={{ r: 5 }}
@@ -298,13 +398,13 @@ export default function Progresso() {
                               <Line
                                 type="monotone"
                                 dataKey="Geometria Plana"
-                                stroke="hsl(var(--chart-4))"
+                                stroke="var(--color-Geometria Plana)"
                                 strokeWidth={2}
                                 dot={{ r: 3 }}
                                 activeDot={{ r: 5 }}
                               />
                             </LineChart>
-                          </ResponsiveContainer>
+                          </ChartContainer>
                         </div>
                       </CardContent>
                     </Card>
@@ -522,4 +622,3 @@ export default function Progresso() {
     </div>
   )
 }
-

@@ -12,6 +12,28 @@ import { AlertCircle, ArrowLeft, ArrowRight, CheckCircle, Clock, HelpCircle } fr
 import { Label } from "@/components/ui/label"
 import { FileDown, FileText, CheckCircle2, XCircle } from "lucide-react"
 
+// Adicionar imports necessários para o dropdown
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
+import { LogOut, Settings, User } from "lucide-react"
+
 function GabaritoView() {
   const [respostas, setRespostas] = useState<Record<number, string>>({})
   const [mostrarCorrecao, setMostrarCorrecao] = useState(false)
@@ -232,11 +254,68 @@ export default function QuestoesDiarias() {
                 Desafios
               </Link>
             </nav>
-            <div className="flex items-center gap-2">
+            {/* Substituir o div do avatar do usuário por um dropdown menu */}
+            {/* Localizar: */}
+            {/* <div className="flex items-center gap-2">
               <span className="text-sm font-medium">Olá, Maria</span>
               <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium">
                 M
               </div>
+            </div> */}
+
+            {/* Substituir por: */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">Olá, Maria</span>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium cursor-pointer hover:bg-primary/20 transition-colors">
+                    M
+                  </div>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link href="/perfil" className="cursor-pointer flex items-center">
+                      <User className="mr-2 h-4 w-4" />
+                      <span>Perfil</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <Link href="/configuracoes" className="cursor-pointer flex items-center">
+                      <Settings className="mr-2 h-4 w-4" />
+                      <span>Configurações</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <DropdownMenuItem
+                        onSelect={(e) => e.preventDefault()}
+                        className="cursor-pointer text-red-600 focus:text-red-600"
+                      >
+                        <LogOut className="mr-2 h-4 w-4" />
+                        <span>Sair</span>
+                      </DropdownMenuItem>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Deseja realmente sair?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Você será desconectado da sua conta. Para continuar estudando, será necessário fazer login
+                          novamente.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                        <AlertDialogAction asChild>
+                          <Link href="/login">Sair</Link>
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
         </header>
@@ -388,11 +467,68 @@ export default function QuestoesDiarias() {
               Desafios
             </Link>
           </nav>
-          <div className="flex items-center gap-2">
+          {/* Substituir o div do avatar do usuário por um dropdown menu */}
+          {/* Localizar: */}
+          {/* <div className="flex items-center gap-2">
             <span className="text-sm font-medium">Olá, Maria</span>
             <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium">
               M
             </div>
+          </div> */}
+
+          {/* Substituir por: */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium">Olá, Maria</span>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium cursor-pointer hover:bg-primary/20 transition-colors">
+                  M
+                </div>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/perfil" className="cursor-pointer flex items-center">
+                    <User className="mr-2 h-4 w-4" />
+                    <span>Perfil</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href="/configuracoes" className="cursor-pointer flex items-center">
+                    <Settings className="mr-2 h-4 w-4" />
+                    <span>Configurações</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <DropdownMenuItem
+                      onSelect={(e) => e.preventDefault()}
+                      className="cursor-pointer text-red-600 focus:text-red-600"
+                    >
+                      <LogOut className="mr-2 h-4 w-4" />
+                      <span>Sair</span>
+                    </DropdownMenuItem>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Deseja realmente sair?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Você será desconectado da sua conta. Para continuar estudando, será necessário fazer login
+                        novamente.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                      <AlertDialogAction asChild>
+                        <Link href="/login">Sair</Link>
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </header>
@@ -643,4 +779,3 @@ export default function QuestoesDiarias() {
     </div>
   )
 }
-
