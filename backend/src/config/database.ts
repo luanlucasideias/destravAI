@@ -4,6 +4,7 @@ import { User } from "../entities/User";
 import { CompetencyMetadata } from "../entities/CompetencyMetadata";
 import { StudentCompetencyProgress } from "../entities/StudentCompetencyProgress";
 import { Question } from "../entities/Question";
+import { StudentQuestionSession } from "../entities/StudentQuestionSession";
 
 dotenv.config();
 
@@ -16,7 +17,10 @@ export const AppDataSource = new DataSource({
   database: process.env.DB_NAME || "distravAI_questions",
   synchronize: false, // Desativando a sincronização automática
   logging: process.env.NODE_ENV === "development",
-  entities: [User, CompetencyMetadata, StudentCompetencyProgress, Question],
+  entities: [User, CompetencyMetadata, StudentCompetencyProgress, Question, StudentQuestionSession],
   migrations: [__dirname + "/../migrations/**/*.ts"],
   subscribers: [__dirname + "/../subscribers/**/*.ts"],
 }); 
+
+
+

@@ -46,7 +46,7 @@ export class CompetencyController {
         return res.status(400).json({ message: "Invalid competency ID" });
       }
 
-      // Buscar questões do banco relacional (PostgreSQL)
+      // Buscar questões do banco relacional (PostgreSQL) e criar sessão
       const result = await this.questionService.getQuestionsForCompetency(studentId, competencyIdNumber);
       if (!result.questions.length) {
         return res.status(404).json({ message: "Nenhuma questão encontrada para a competência informada." });
@@ -61,17 +61,25 @@ export class CompetencyController {
   async submitAnswers(req: Request, res: Response) {
     try {
       const { studentId, competencyId } = req.params;
-      const { answers } = req.body;
+      const { answers, sessionId } = req.body;
 
       if (!Array.isArray(answers)) {
         return res.status(400).json({ message: "Answers must be an array" });
+      }
+      if (!sessionId) {
+        return res.status(400).json({ message: "SessionId é obrigatório" });
       }
 
       const result = await this.questionService.processAnswers(
         studentId,
         parseInt(competencyId),
-        answers
+        answers,
+        sessionId
       );
+
+      if (!result.success) {
+        return res.status(400).json({ message: result.message || "Erro ao processar respostas" });
+      }
 
       return res.json(result);
     } catch (error) {

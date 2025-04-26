@@ -1,10 +1,12 @@
 import { AppDataSource } from "../config/database";
 import { Question } from "../entities/Question";
 import { StudentCompetencyProgress } from "../entities/StudentCompetencyProgress";
+import { StudentQuestionSession } from "../entities/StudentQuestionSession";
 
 export class QuestionService {
   private questionRepository = AppDataSource.getRepository(Question);
   private progressRepository = AppDataSource.getRepository(StudentCompetencyProgress);
+  private sessionRepository = AppDataSource.getRepository(StudentQuestionSession);
 
   async getQuestionsForCompetency(studentId: string, competencyId: number) {
     console.log(`Iniciando busca de questões para estudante ${studentId} e competência ${competencyId}`);
@@ -68,6 +70,26 @@ export class QuestionService {
 
     console.log(`Selecionadas ${selectedQuestions.length} questões`);
 
+    // Buscar a última sessão para obter a última competência abordada
+    const lastSession = await this.sessionRepository.findOne({
+      where: { student_id: studentId },
+      order: { created_at: "DESC" }
+    });
+    const lastCompetencyId = lastSession?.competency_id;
+
+    // Criar sessão de questões
+    const session = this.sessionRepository.create({
+      student_id: studentId,
+      competency_id: competencyId,
+      question_ids: selectedQuestions.map(q => q.id),
+      answers_given: [],
+      current_question_index: 0,
+      total_questions_required: numberOfQuestions,
+      session_completed: false,
+      last_competency_id: lastCompetencyId ?? null
+    });
+    await this.sessionRepository.save(session);
+
     return {
       questions: selectedQuestions,
       masteryLevel,
@@ -76,32 +98,46 @@ export class QuestionService {
         description: allQuestions[0]?.competencyDescription,
         subjectCode: allQuestions[0]?.subjectCode,
         topicCode: allQuestions[0]?.topicCode
-      }
+      },
+      sessionId: session.id
     };
   }
 
   async processAnswers(
     studentId: string,
     competencyId: number,
-    answers: Array<{ questionId: number; answer: string }>
-  ): Promise<{ success: boolean; newLevel: number }> {
+    answers: Array<{ questionId: number; answer: string }>,
+    sessionId?: string
+  ): Promise<{ success: boolean; newLevel?: number; message?: string }> {
     try {
-      // Verificar respostas
+      // Validar sessão
+      if (!sessionId) {
+        return { success: false, message: "SessionId é obrigatório." };
+      }
+      const session = await this.sessionRepository.findOne({ where: { id: sessionId, student_id: studentId, competency_id: competencyId } });
+      if (!session) {
+        return { success: false, message: "Sessão não encontrada." };
+      }
+      if (session.session_completed) {
+        return { success: false, message: "Sessão já finalizada." };
+      }
+      // Registrar respostas
+      session.answers_given = answers.map(a => a.answer);
+      session.session_completed = true;
+      session.last_interaction_at = new Date();
+      session.last_competency_id = session.competency_id;
+      await this.sessionRepository.save(session);
+
+      // Verificar respostas corretas
       const correctAnswers = await Promise.all(
         answers.map(async ({ questionId, answer }) => {
-          const question = await this.questionRepository.findOne({
-            where: { id: questionId }
-          });
-          console.log(`Questão:`, question);
-          console.log(`Resposta recebida: ${answer}`);
-          console.log(`Resposta correta: ${question?.correct_answer}`);
+          const question = await this.questionRepository.findOne({ where: { id: questionId } });
           return question && question.correct_answer === answer;
         })
       );
-
       const correctCount = correctAnswers.filter(Boolean).length;
-      console.log(`Número de acertos: ${correctCount}`);
 
+      // Atualizar progresso
       const currentProgress = await this.progressRepository.findOne({
         where: {
           student_id: studentId,
@@ -109,43 +145,19 @@ export class QuestionService {
         }
       });
       const currentLevel = currentProgress?.mastery_level || 0;
-      console.log(`Nível atual: ${currentLevel}`);
-
-      // Determinar novo nível baseado no nível atual e número de acertos
       let newLevel = currentLevel;
-      
       if (currentLevel === 0) {
-        // Nível 0: 1 acerto -> nível 1, 2 acertos -> nível 2, 3 acertos -> nível 3
-        if (correctCount === 1) {
-          newLevel = 1;
-        } else if (correctCount === 2) {
-          newLevel = 2;
-        } else if (correctCount === 3) {
-          newLevel = 3;
-        }
+        if (correctCount === 1) newLevel = 1;
+        else if (correctCount === 2) newLevel = 2;
+        else if (correctCount === 3) newLevel = 3;
       } else if (currentLevel === 1) {
-        // Nível 1: 1 acerto -> nível 1, 2 acertos -> nível 2, 0 acertos -> nível 0
-        if (correctCount === 1) {
-          newLevel = 1;
-        } else if (correctCount === 2) {
-          newLevel = 2;
-        }
-        else if (correctCount === 0) {
-          newLevel = 0;
-        }
+        if (correctCount === 1) newLevel = 1;
+        else if (correctCount === 2) newLevel = 2;
+        else if (correctCount === 0) newLevel = 0;
       } else if (currentLevel === 2) {
-        // Nível 2: 1 acerto -> nível 3
-        if (correctCount === 1) {
-          newLevel = 3;
-        }
-        else if (correctCount === 0) {
-          newLevel = 1;
-        }
+        if (correctCount === 1) newLevel = 3;
+        else if (correctCount === 0) newLevel = 1;
       }
-
-      console.log(`Novo nível calculado: ${newLevel}`);
-
-      // Atualizar nível de domínio
       await this.progressRepository.upsert(
         {
           student_id: studentId,
@@ -155,11 +167,7 @@ export class QuestionService {
         },
         ["student_id", "competency_id"]
       );
-
-      return {
-        success: true,
-        newLevel
-      };
+      return { success: true, newLevel };
     } catch (error) {
       console.error('Error processing answers:', error);
       throw error;

@@ -1,8 +1,10 @@
 import { AppDataSource } from "../config/database";
 import { StudentCompetencyProgress } from "../entities/StudentCompetencyProgress";
+import { StudentQuestionSession } from "../entities/StudentQuestionSession";
 
 export class CompetencySelectorService {
   private studentProgressRepository = AppDataSource.getRepository(StudentCompetencyProgress);
+  private sessionRepository = AppDataSource.getRepository(StudentQuestionSession);
 
   async getNextCompetency(studentId: string): Promise<number | null> {
     try {
@@ -18,6 +20,14 @@ export class CompetencySelectorService {
         console.log("Nenhum progresso encontrado para o aluno");
         return null;
       }
+
+      // Busca a última competência abordada na sessão mais recente FINALIZADA
+      const lastSession = await this.sessionRepository.findOne({
+        where: { student_id: studentId, session_completed: true },
+        order: { created_at: "DESC" }
+      });
+      const lastCompetencyId = lastSession?.competency_id;
+      console.log("Última competência abordada:", lastCompetencyId);
 
       // Filtra competências não dominadas (mastery_level < 3)
       const availableCompetencies = progress.filter(p => p.mastery_level < 3);
@@ -38,14 +48,23 @@ export class CompetencySelectorService {
       });
       console.log("Competências agrupadas por nível:", Object.fromEntries(competenciesByLevel));
 
-      // Pega o maior nível disponível
-      const maxLevel = Math.max(...Array.from(competenciesByLevel.keys()));
-      console.log("Maior nível encontrado:", maxLevel);
-
-      // Seleciona aleatoriamente entre as competências do maior nível
-      const competenciesAtMaxLevel = competenciesByLevel.get(maxLevel) || [];
-      const randomIndex = Math.floor(Math.random() * competenciesAtMaxLevel.length);
-      const selectedCompetency = competenciesAtMaxLevel[randomIndex];
+      // Ordena os níveis do maior para o menor
+      const sortedLevels = Array.from(competenciesByLevel.keys()).sort((a, b) => b - a);
+      let eligibleCompetencies: number[] = [];
+      for (const level of sortedLevels) {
+        const comps = competenciesByLevel.get(level) || [];
+        const filtered = lastCompetencyId ? comps.filter(cid => cid !== lastCompetencyId) : comps;
+        if (filtered.length > 0) {
+          eligibleCompetencies = filtered;
+          break;
+        }
+      }
+      // Se não encontrou nenhuma elegível, pode repetir a última (única opção)
+      if (eligibleCompetencies.length === 0 && lastCompetencyId) {
+        eligibleCompetencies = [lastCompetencyId];
+      }
+      const randomIndex = Math.floor(Math.random() * eligibleCompetencies.length);
+      const selectedCompetency = eligibleCompetencies[randomIndex];
       console.log("Competência selecionada:", selectedCompetency);
 
       return selectedCompetency;

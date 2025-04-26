@@ -12,10 +12,10 @@ export class StudentQuestionSession {
     @Column()
     competency_id!: number;
 
-    @Column("simple-array")
+    @Column("int", { array: true })
     question_ids!: number[];
 
-    @Column("simple-array", { nullable: true })
+    @Column("text", { array: true, nullable: true })
     answers_given!: string[];
 
     @Column()
@@ -38,6 +38,9 @@ export class StudentQuestionSession {
         competency_id: number;
         cooldown_until: Date;
     };
+
+    @Column({ type: "int", nullable: true })
+    last_competency_id?: number;
 
     // Campos calculados (não são armazenados no banco)
     questions?: Question[]; // Será preenchido ao carregar a sessão

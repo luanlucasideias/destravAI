@@ -223,6 +223,8 @@ export default function QuestoesDiarias() {
   const [alternativaSelecionada, setAlternativaSelecionada] = useState<string | null>(null);
   const [questaoRespondida, setQuestaoRespondida] = useState(false);
   const [showResolucao, setShowResolucao] = useState(false);
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [respostasBloco, setRespostasBloco] = useState<{ questionId: number; answer: string }[]>([]);
 
   // Buscar próxima competência
   const fetchNextCompetency = async () => {
@@ -268,50 +270,55 @@ export default function QuestoesDiarias() {
       setCurrentQuestionIndex(0);
       setQuestaoRespondida(false);
       setAlternativaSelecionada(null);
+      setSessionId(data.sessionId || null);
+      setRespostasBloco([]);
     } catch (err) {
       setError('Erro ao buscar questões');
       console.error('Erro detalhado ao buscar questões:', err);
     }
   };
 
-  // Processar resposta
-  const handleAnswer = async (answer: string) => {
+  // Processar resposta localmente
+  const handleAnswer = (answer: string) => {
     if (!currentCompetency || !currentQuestions[currentQuestionIndex]) return;
-
-    try {
-      // Enviar resposta
-      await fetch(
-        `http://localhost:3001/api/competencies/student/123e4567-e89b-12d3-a456-426614174000/competencies/${currentCompetency.id}/answers`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            answers: [{
-              questionId: currentQuestions[currentQuestionIndex].id,
-              answer: answer
-            }]
-          })
-        }
-      );
-
-      // Verificar se é a última questão da rodada
-      if (currentQuestionIndex === currentQuestions.length - 1) {
-        // Buscar nova competência
-        const newCompetency = await fetchNextCompetency();
-        if (newCompetency) {
-          await fetchQuestions(newCompetency.id);
-        }
-      } else {
-        // Próxima questão da rodada
-        setCurrentQuestionIndex(prev => prev + 1);
-        setQuestaoRespondida(false);
-        setAlternativaSelecionada(null);
+    // Armazenar resposta localmente
+    setRespostasBloco(prev => [
+      ...prev,
+      { questionId: currentQuestions[currentQuestionIndex].id, answer }
+    ]);
+    // Verificar se é a última questão do bloco
+    if (currentQuestionIndex === currentQuestions.length - 1) {
+      // Enviar todas as respostas do bloco ao backend
+      if (sessionId) {
+        fetch(
+          `http://localhost:3001/api/competencies/student/123e4567-e89b-12d3-a456-426614174000/competencies/${currentCompetency.id}/answers`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              answers: [...respostasBloco, { questionId: currentQuestions[currentQuestionIndex].id, answer }],
+              sessionId
+            })
+          }
+        ).then(async (res) => {
+          if (!res.ok) {
+            setError('Erro ao processar respostas do bloco');
+            return;
+          }
+          // Buscar nova competência
+          const newCompetency = await fetchNextCompetency();
+          if (newCompetency) {
+            await fetchQuestions(newCompetency.id);
+          }
+        });
       }
-    } catch (err) {
-      setError('Erro ao processar resposta');
-      console.error(err);
+    } else {
+      // Próxima questão do bloco
+      setCurrentQuestionIndex(prev => prev + 1);
+      setQuestaoRespondida(false);
+      setAlternativaSelecionada(null);
     }
   };
 
