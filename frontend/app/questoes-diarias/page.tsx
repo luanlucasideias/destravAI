@@ -8,9 +8,16 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Progress } from "@/components/ui/progress"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Separator } from "@/components/ui/separator"
-import { AlertCircle, ArrowLeft, ArrowRight, CheckCircle, Clock, HelpCircle } from "lucide-react"
+import { AlertCircle, ArrowLeft, ArrowRight, CheckCircle, Clock, HelpCircle, X } from "lucide-react"
 import { Label } from "@/components/ui/label"
 import { FileDown, FileText, CheckCircle2, XCircle } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import YouTube from 'react-youtube'
 
 // Adicionar imports necessários para o dropdown
 import {
@@ -33,6 +40,24 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { LogOut, Settings, User } from "lucide-react"
+
+interface Question {
+  id: number;
+  competencyId: number;
+  text: string;
+  options: string[];
+  correctAnswer: string;
+  difficulty: number;
+  competencyDescription: string;
+  subjectCode: string;
+  topicCode: string;
+}
+
+interface Competency {
+  id: number;
+  name: string;
+  description: string;
+}
 
 function GabaritoView() {
   const [respostas, setRespostas] = useState<Record<number, string>>({})
@@ -185,261 +210,150 @@ function GabaritoView() {
 export default function QuestoesDiarias() {
   const searchParams = useSearchParams()
   const router = useRouter()
-  const materia = searchParams.get("materia")
-  const mostrarDiagnostico = searchParams.get("mostrarDiagnostico") === "true"
-  const novaLista = searchParams.get("novaLista") === "true"
-  const quantidade = searchParams.get("quantidade") || "15"
+  const materia = searchParams?.get("materia") ?? null
+  const mostrarDiagnostico = searchParams?.get("mostrarDiagnostico") === "true"
+  const novaLista = searchParams?.get("novaLista") === "true"
+  const quantidade = searchParams?.get("quantidade") || "15"
   const [questoesCompletas, setQuestoesCompletas] = useState(false)
+  const [currentCompetency, setCurrentCompetency] = useState<Competency | null>(null);
+  const [currentQuestions, setCurrentQuestions] = useState<Question[]>([]);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [alternativaSelecionada, setAlternativaSelecionada] = useState<string | null>(null);
+  const [questaoRespondida, setQuestaoRespondida] = useState(false);
+  const [showResolucao, setShowResolucao] = useState(false);
 
-  // Efeito para gerar nova lista de questões quando o parâmetro novaLista estiver presente
-  useEffect(() => {
-    if (novaLista) {
-      // Em um cenário real, aqui você faria uma chamada à API para gerar novas questões
-      console.log(`Gerando nova lista de ${quantidade} questões para a matéria: ${materia || "geral"}`)
-
-      // Redirecionar para a primeira questão sem o parâmetro novaLista para evitar regeneração infinita
-      // Em um cenário real, você redirecionaria para a primeira questão da nova lista
-      // Esta linha está comentada para não causar redirecionamento infinito no ambiente de desenvolvimento
-      // router.push(`/questoes-diarias?materia=${materia || 'geral'}&questao=1`);
+  // Buscar próxima competência
+  const fetchNextCompetency = async () => {
+    try {
+      const response = await fetch(`http://localhost:3001/api/competencies/student/123e4567-e89b-12d3-a456-426614174000/next`);
+      const data = await response.json();
+      console.log('Competência recebida:', data);
+      
+      // Criar objeto de competência com o ID recebido
+      const competency = {
+        id: data.competencyId,
+        name: "Competência " + data.competencyId,
+        description: "Descrição da competência"
+      };
+      
+      setCurrentCompetency(competency);
+      return competency;
+    } catch (err) {
+      console.error('Erro detalhado:', err);
+      setError('Erro ao buscar próxima competência');
+      return null;
     }
-  }, [novaLista, materia, quantidade, router])
+  };
 
-  const [alternativaSelecionada, setAlternativaSelecionada] = useState<string | null>(null)
-  const [questaoRespondida, setQuestaoRespondida] = useState(false)
-  const [respostaCorreta, setRespostaCorreta] = useState(false)
-  const [alternativaCorreta] = useState("b") // Simulando que a alternativa correta é a "b"
+  // Buscar questões da competência
+  const fetchQuestions = async (competencyId: number) => {
+    try {
+      console.log('Buscando questões para competência:', competencyId);
+      const response = await fetch(
+        `http://localhost:3001/api/competencies/student/123e4567-e89b-12d3-a456-426614174000/competencies/${competencyId}/questions`
+      );
+      const data = await response.json();
+      console.log('Questões recebidas do backend:', data);
+      
+      // Atualizar informações da competência
+      setCurrentCompetency({
+        id: data.competencyInfo.id,
+        name: data.competencyInfo.description,
+        description: `${data.competencyInfo.subjectCode} - ${data.competencyInfo.topicCode}`
+      });
+      
+      setCurrentQuestions(data.questions);
+      setCurrentQuestionIndex(0);
+      setQuestaoRespondida(false);
+      setAlternativaSelecionada(null);
+    } catch (err) {
+      setError('Erro ao buscar questões');
+      console.error('Erro detalhado ao buscar questões:', err);
+    }
+  };
+
+  // Processar resposta
+  const handleAnswer = async (answer: string) => {
+    if (!currentCompetency || !currentQuestions[currentQuestionIndex]) return;
+
+    try {
+      // Enviar resposta
+      await fetch(
+        `http://localhost:3001/api/competencies/student/123e4567-e89b-12d3-a456-426614174000/competencies/${currentCompetency.id}/answers`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            answers: [{
+              questionId: currentQuestions[currentQuestionIndex].id,
+              answer: answer
+            }]
+          })
+        }
+      );
+
+      // Verificar se é a última questão da rodada
+      if (currentQuestionIndex === currentQuestions.length - 1) {
+        // Buscar nova competência
+        const newCompetency = await fetchNextCompetency();
+        if (newCompetency) {
+          await fetchQuestions(newCompetency.id);
+        }
+      } else {
+        // Próxima questão da rodada
+        setCurrentQuestionIndex(prev => prev + 1);
+        setQuestaoRespondida(false);
+        setAlternativaSelecionada(null);
+      }
+    } catch (err) {
+      setError('Erro ao processar resposta');
+      console.error(err);
+    }
+  };
+
+  // Inicialização
+  useEffect(() => {
+    const initialize = async () => {
+      setIsLoading(true);
+      const competency = await fetchNextCompetency();
+      if (competency) {
+        await fetchQuestions(competency.id);
+      }
+      setIsLoading(false);
+    };
+
+    initialize();
+  }, []);
 
   const verificarResposta = () => {
-    setQuestaoRespondida(true)
-    setRespostaCorreta(alternativaSelecionada === alternativaCorreta)
+    if (!alternativaSelecionada) return;
+    setQuestaoRespondida(true);
+  };
+
+  if (isLoading) {
+    return <div>Carregando...</div>;
   }
 
-  const irParaProximaQuestao = () => {
-    setAlternativaSelecionada(null)
-    setQuestaoRespondida(false)
-    setRespostaCorreta(false)
-    // Aqui você carregaria a próxima questão em um cenário real
+  if (error) {
+    return <div>Erro: {error}</div>;
   }
 
-  // Função para simular a conclusão das questões e mostrar o diagnóstico
-  const concluirQuestoes = () => {
-    setQuestoesCompletas(true)
+  if (!currentCompetency || !currentQuestions[currentQuestionIndex]) {
+    console.log('Condição de renderização falhou:', {
+      currentCompetency,
+      currentQuestions,
+      currentQuestionIndex,
+      hasCurrentQuestion: currentQuestions[currentQuestionIndex]
+    });
+    return <div>Nenhuma questão disponível no momento.</div>;
   }
 
-  // Se as questões foram concluídas e devemos mostrar o diagnóstico
-  if (questoesCompletas && mostrarDiagnostico) {
-    return (
-      <div className="flex min-h-screen flex-col">
-        <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur">
-          <div className="container flex h-16 items-center justify-between">
-            <div className="flex items-center gap-2 font-bold text-xl">
-              <Link href="/" className="text-primary">
-                Destrav.ai
-              </Link>
-            </div>
-            <nav className="hidden md:flex gap-6">
-              <Link href="/dashboard" className="text-sm font-medium transition-colors hover:text-primary">
-                Dashboard
-              </Link>
-              <Link
-                href="/questoes-diarias"
-                className="text-sm font-medium transition-colors hover:text-primary text-primary"
-              >
-                Questões Diárias
-              </Link>
-              <Link href="/progresso" className="text-sm font-medium transition-colors hover:text-primary">
-                Progresso
-              </Link>
-              <Link href="/desafios" className="text-sm font-medium transition-colors hover:text-primary">
-                Desafios
-              </Link>
-            </nav>
-            {/* Substituir o div do avatar do usuário por um dropdown menu */}
-            {/* Localizar: */}
-            {/* <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">Olá, Maria</span>
-              <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium">
-                M
-              </div>
-            </div> */}
-
-            {/* Substituir por: */}
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium">Olá, Maria</span>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium cursor-pointer hover:bg-primary/20 transition-colors">
-                    M
-                  </div>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel>Minha Conta</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <Link href="/perfil" className="cursor-pointer flex items-center">
-                      <User className="mr-2 h-4 w-4" />
-                      <span>Perfil</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/configuracoes" className="cursor-pointer flex items-center">
-                      <Settings className="mr-2 h-4 w-4" />
-                      <span>Configurações</span>
-                    </Link>
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <AlertDialog>
-                    <AlertDialogTrigger asChild>
-                      <DropdownMenuItem
-                        onSelect={(e) => e.preventDefault()}
-                        className="cursor-pointer text-red-600 focus:text-red-600"
-                      >
-                        <LogOut className="mr-2 h-4 w-4" />
-                        <span>Sair</span>
-                      </DropdownMenuItem>
-                    </AlertDialogTrigger>
-                    <AlertDialogContent>
-                      <AlertDialogHeader>
-                        <AlertDialogTitle>Deseja realmente sair?</AlertDialogTitle>
-                        <AlertDialogDescription>
-                          Você será desconectado da sua conta. Para continuar estudando, será necessário fazer login
-                          novamente.
-                        </AlertDialogDescription>
-                      </AlertDialogHeader>
-                      <AlertDialogFooter>
-                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                        <AlertDialogAction asChild>
-                          <Link href="/login">Sair</Link>
-                        </AlertDialogAction>
-                      </AlertDialogFooter>
-                    </AlertDialogContent>
-                  </AlertDialog>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
-        </header>
-        <main className="flex-1 container py-6">
-          <div className="flex flex-col gap-6 max-w-3xl mx-auto">
-            <div className="flex items-center justify-between">
-              <div>
-                <h1 className="text-2xl font-bold">Relatório de Diagnóstico</h1>
-                <p className="text-sm text-muted-foreground">Análise do seu desempenho em Matemática</p>
-              </div>
-              <Button variant="outline" asChild>
-                <Link href="/dashboard">Voltar ao Dashboard</Link>
-              </Button>
-            </div>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Resumo da Sessão</CardTitle>
-                <CardDescription>Você completou 15 questões de Matemática</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="text-sm font-medium">Taxa de acerto</div>
-                    <div className="text-sm text-muted-foreground">73%</div>
-                  </div>
-                  <Progress value={73} className="h-2" />
-                </div>
-
-                <div className="pt-4">
-                  <h3 className="text-lg font-medium mb-2">Pontos fortes</h3>
-                  <ul className="space-y-2">
-                    <li className="flex items-start gap-2">
-                      <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />
-                      <div>
-                        <div className="font-medium">Geometria Plana</div>
-                        <div className="text-sm text-muted-foreground">Você acertou 90% das questões deste tópico</div>
-                      </div>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <CheckCircle className="h-5 w-5 text-green-500 mt-0.5" />
-                      <div>
-                        <div className="font-medium">Funções do 1º Grau</div>
-                        <div className="text-sm text-muted-foreground">Você acertou 85% das questões deste tópico</div>
-                      </div>
-                    </li>
-                  </ul>
-                </div>
-
-                <div className="pt-2">
-                  <h3 className="text-lg font-medium mb-2">Áreas para melhorar</h3>
-                  <ul className="space-y-2">
-                    <li className="flex items-start gap-2">
-                      <AlertCircle className="h-5 w-5 text-red-500 mt-0.5" />
-                      <div>
-                        <div className="font-medium">Geometria Analítica</div>
-                        <div className="text-sm text-muted-foreground">
-                          Você acertou apenas 45% das questões deste tópico
-                        </div>
-                      </div>
-                    </li>
-                    <li className="flex items-start gap-2">
-                      <AlertCircle className="h-5 w-5 text-red-500 mt-0.5" />
-                      <div>
-                        <div className="font-medium">Trigonometria</div>
-                        <div className="text-sm text-muted-foreground">
-                          Você acertou apenas 50% das questões deste tópico
-                        </div>
-                      </div>
-                    </li>
-                  </ul>
-                </div>
-              </CardContent>
-              <CardFooter>
-                <Button className="w-full" asChild>
-                  <Link href="/progresso">
-                    Ver relatório completo
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Link>
-                </Button>
-              </CardFooter>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>Recomendações Personalizadas</CardTitle>
-                <CardDescription>Com base no seu desempenho, recomendamos:</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="rounded-lg border p-3">
-                    <div className="font-medium">Revisar conceitos de Geometria Analítica</div>
-                    <div className="text-sm text-muted-foreground mt-1">
-                      Foque em distância entre ponto e reta, e equações de circunferências.
-                    </div>
-                  </div>
-                  <div className="rounded-lg border p-3">
-                    <div className="font-medium">Praticar mais questões de Trigonometria</div>
-                    <div className="text-sm text-muted-foreground mt-1">
-                      Especialmente relações trigonométricas no triângulo retângulo.
-                    </div>
-                  </div>
-                  <div className="rounded-lg border p-3">
-                    <div className="font-medium">Continuar praticando Geometria Plana</div>
-                    <div className="text-sm text-muted-foreground mt-1">
-                      Você está indo bem, mas mantenha a prática para consolidar o conhecimento.
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-              <CardFooter className="flex gap-2">
-                <Button variant="outline" className="w-full" asChild>
-                  <Link href="/questoes-diarias?novaLista=true&materia=geral&quantidade=15">Novas questões</Link>
-                </Button>
-                <Button className="w-full" asChild>
-                  <Link href="/dashboard">Voltar ao Dashboard</Link>
-                </Button>
-              </CardFooter>
-            </Card>
-          </div>
-        </main>
-      </div>
-    )
-  }
+  const currentQuestion = currentQuestions[currentQuestionIndex];
+  console.log('Questão atual:', currentQuestion);
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -556,12 +470,12 @@ export default function QuestoesDiarias() {
               )}
               <div className="text-sm text-muted-foreground flex items-center">
                 <Clock className="h-4 w-4 mr-1" />
-                <span>Questão 3 de 15</span>
+                <span>Questão {currentQuestionIndex + 1} de {currentQuestions.length}</span>
               </div>
             </div>
           </div>
 
-          {searchParams.get("gabarito") === "true" ? (
+          {searchParams?.get("gabarito") === "true" ? (
             <GabaritoView />
           ) : (
             <>
@@ -575,21 +489,20 @@ export default function QuestoesDiarias() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="bg-primary/10 text-primary font-medium text-sm px-3 py-1 rounded-full">
-                        Matemática
+                        {currentCompetency?.description}
                       </div>
-                      <div className="text-sm text-muted-foreground">Geometria Analítica</div>
+                      <div className="text-sm text-muted-foreground">{currentCompetency?.name}</div>
                     </div>
                     <div className="flex items-center gap-1 text-sm text-muted-foreground">
                       <HelpCircle className="h-4 w-4" />
-                      <span>Dificuldade: Média</span>
+                      <span>Dificuldade: {currentQuestion?.difficulty === 1 ? 'Fácil' : currentQuestion?.difficulty === 2 ? 'Média' : 'Difícil'}</span>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="text-base">
                     <p>
-                      Considere uma circunferência de centro C(3, 4) e raio 5. Determine a equação da reta tangente a
-                      essa circunferência no ponto P(7, 6).
+                      {currentQuestion.text}
                     </p>
                   </div>
 
@@ -597,118 +510,79 @@ export default function QuestoesDiarias() {
                     className="space-y-3"
                     value={alternativaSelecionada || ""}
                     onValueChange={setAlternativaSelecionada}
+                    disabled={questaoRespondida}
                   >
-                    <div
-                      className={`flex items-center space-x-2 rounded-lg border p-4 hover:bg-muted/50 ${
-                        questaoRespondida &&
-                        alternativaSelecionada === "a" &&
-                        alternativaSelecionada !== alternativaCorreta
-                          ? "bg-red-50 border-red-300"
-                          : ""
-                      } ${questaoRespondida && alternativaCorreta === "a" ? "bg-green-50 border-green-300" : ""}`}
-                    >
-                      <RadioGroupItem value="a" id="a" disabled={questaoRespondida} />
-                      <Label
-                        htmlFor="a"
-                        className={`flex-1 cursor-pointer ${
-                          questaoRespondida && alternativaCorreta === "a" ? "font-medium text-green-700" : ""
-                        } ${questaoRespondida && alternativaSelecionada === "a" && alternativaSelecionada !== alternativaCorreta ? "font-medium text-red-700" : ""}`}
+                    {currentQuestion.options.map((option, index) => (
+                      <div
+                        key={index}
+                        className={`flex items-center space-x-2 rounded-lg border p-4 hover:bg-muted/50 ${
+                          questaoRespondida &&
+                          alternativaSelecionada === option
+                            ? "bg-green-50 border-green-300"
+                            : ""
+                        }`}
                       >
-                        4x - 2y - 16 = 0
-                      </Label>
-                    </div>
-                    <div
-                      className={`flex items-center space-x-2 rounded-lg border p-4 hover:bg-muted/50 ${
-                        questaoRespondida &&
-                        alternativaSelecionada === "b" &&
-                        alternativaSelecionada !== alternativaCorreta
-                          ? "bg-red-50 border-red-300"
-                          : ""
-                      } ${questaoRespondida && alternativaCorreta === "b" ? "bg-green-50 border-green-300" : ""}`}
-                    >
-                      <RadioGroupItem value="b" id="b" disabled={questaoRespondida} />
-                      <Label
-                        htmlFor="b"
-                        className={`flex-1 cursor-pointer ${
-                          questaoRespondida && alternativaCorreta === "b" ? "font-medium text-green-700" : ""
-                        } ${questaoRespondida && alternativaSelecionada === "b" && alternativaSelecionada !== alternativaCorreta ? "font-medium text-red-700" : ""}`}
-                      >
-                        4x + 2y - 40 = 0
-                      </Label>
-                    </div>
-                    <div
-                      className={`flex items-center space-x-2 rounded-lg border p-4 hover:bg-muted/50 ${
-                        questaoRespondida &&
-                        alternativaSelecionada === "c" &&
-                        alternativaSelecionada !== alternativaCorreta
-                          ? "bg-red-50 border-red-300"
-                          : ""
-                      } ${questaoRespondida && alternativaCorreta === "c" ? "bg-green-50 border-green-300" : ""}`}
-                    >
-                      <RadioGroupItem value="c" id="c" disabled={questaoRespondida} />
-                      <Label
-                        htmlFor="c"
-                        className={`flex-1 cursor-pointer ${
-                          questaoRespondida && alternativaCorreta === "c" ? "font-medium text-green-700" : ""
-                        } ${questaoRespondida && alternativaSelecionada === "c" && alternativaSelecionada !== alternativaCorreta ? "font-medium text-red-700" : ""}`}
-                      >
-                        2x - 4y + 10 = 0
-                      </Label>
-                    </div>
-                    <div
-                      className={`flex items-center space-x-2 rounded-lg border p-4 hover:bg-muted/50 ${
-                        questaoRespondida &&
-                        alternativaSelecionada === "d" &&
-                        alternativaSelecionada !== alternativaCorreta
-                          ? "bg-red-50 border-red-300"
-                          : ""
-                      } ${questaoRespondida && alternativaCorreta === "d" ? "bg-green-50 border-green-300" : ""}`}
-                    >
-                      <RadioGroupItem value="d" id="d" disabled={questaoRespondida} />
-                      <Label
-                        htmlFor="d"
-                        className={`flex-1 cursor-pointer ${
-                          questaoRespondida && alternativaCorreta === "d" ? "font-medium text-green-700" : ""
-                        } ${questaoRespondida && alternativaSelecionada === "d" && alternativaSelecionada !== alternativaCorreta ? "font-medium text-red-700" : ""}`}
-                      >
-                        8x - 4y - 32 = 0
-                      </Label>
-                    </div>
-                    <div
-                      className={`flex items-center space-x-2 rounded-lg border p-4 hover:bg-muted/50 ${
-                        questaoRespondida &&
-                        alternativaSelecionada === "e" &&
-                        alternativaSelecionada !== alternativaCorreta
-                          ? "bg-red-50 border-red-300"
-                          : ""
-                      } ${questaoRespondida && alternativaCorreta === "e" ? "bg-green-50 border-green-300" : ""}`}
-                    >
-                      <RadioGroupItem value="e" id="e" disabled={questaoRespondida} />
-                      <Label
-                        htmlFor="e"
-                        className={`flex-1 cursor-pointer ${
-                          questaoRespondida && alternativaCorreta === "e" ? "font-medium text-green-700" : ""
-                        } ${questaoRespondida && alternativaSelecionada === "e" && alternativaSelecionada !== alternativaCorreta ? "font-medium text-red-700" : ""}`}
-                      >
-                        4x - 4y + 4 = 0
-                      </Label>
-                    </div>
+                        <RadioGroupItem value={option} id={`option-${index}`} disabled={questaoRespondida} />
+                        <Label
+                          htmlFor={`option-${index}`}
+                          className={`flex-1 cursor-pointer ${
+                            questaoRespondida && alternativaSelecionada === option ? "font-medium text-green-700" : ""
+                          }`}
+                        >
+                          {option}
+                        </Label>
+                      </div>
+                    ))}
                   </RadioGroup>
 
                   {questaoRespondida && (
                     <div
-                      className={`mt-4 p-4 rounded-lg ${respostaCorreta ? "bg-green-50 border border-green-200" : "bg-red-50 border border-red-200"}`}
+                      className={`mt-4 p-4 rounded-lg ${alternativaSelecionada === currentQuestion.correctAnswer ? "bg-green-50 border border-green-200" : "bg-red-50 border border-red-200"}`}
                     >
-                      <div className={`font-medium ${respostaCorreta ? "text-green-700" : "text-red-700"}`}>
-                        {respostaCorreta ? "Parabéns! Você acertou." : "Você errou."}
+                      <div className={`font-medium ${alternativaSelecionada === currentQuestion.correctAnswer ? "text-green-700" : "text-red-700"}`}>
+                        {alternativaSelecionada === currentQuestion.correctAnswer ? "Parabéns! Você acertou." : "Você errou. A resposta correta é: " + currentQuestion.correctAnswer}
                       </div>
-                      {!respostaCorreta && (
-                        <div className="text-sm mt-1 text-red-600">
-                          A resposta correta é a alternativa {alternativaCorreta.toUpperCase()}: 4x + 2y - 40 = 0
-                        </div>
+                      {alternativaSelecionada !== currentQuestion.correctAnswer && (
+                        <Button 
+                          variant="outline" 
+                          className="mt-2"
+                          onClick={() => setShowResolucao(true)}
+                        >
+                          Ver resolução
+                        </Button>
                       )}
                     </div>
                   )}
+
+                  <Dialog open={showResolucao} onOpenChange={setShowResolucao}>
+                    <DialogContent className="max-w-3xl">
+                      <DialogHeader>
+                        <DialogTitle className="flex items-center justify-between">
+                          <span>Resolução da questão</span>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => setShowResolucao(false)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </DialogTitle>
+                      </DialogHeader>
+                      <div className="aspect-video">
+                        <YouTube
+                          videoId="o1Z9QGmHGqQ"
+                          opts={{
+                            playerVars: {
+                              autoplay: 0,
+                              controls: 1,
+                              modestbranding: 1,
+                            },
+                          }}
+                          className="w-full h-full"
+                        />
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                 </CardContent>
                 <CardFooter className="flex justify-between">
                   <Button variant="outline">
@@ -721,15 +595,16 @@ export default function QuestoesDiarias() {
                         <Button onClick={verificarResposta} disabled={!alternativaSelecionada} variant="secondary">
                           Finalizar
                         </Button>
-                        {mostrarDiagnostico && (
-                          <Button onClick={concluirQuestoes}>
-                            Ver diagnóstico atualizado
-                            <ArrowRight className="ml-2 h-4 w-4" />
-                          </Button>
-                        )}
+                        <Button variant="secondary">
+                          Ir para a próxima questão
+                        </Button>
+                        <Button onClick={() => router.push('/progresso')}>
+                          Ver diagnóstico atualizado
+                          <ArrowRight className="ml-2 h-4 w-4" />
+                        </Button>
                       </>
                     ) : (
-                      <Button onClick={irParaProximaQuestao}>
+                      <Button onClick={() => handleAnswer(alternativaSelecionada!)}>
                         Próxima questão
                         <ArrowRight className="ml-2 h-4 w-4" />
                       </Button>

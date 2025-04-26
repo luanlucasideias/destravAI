@@ -3,6 +3,8 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { AppDataSource } from './config/database';
+import competencyRoutes from './routes/competencyRoutes';
+import authRoutes from './routes/authRoutes';
 
 dotenv.config();
 
@@ -10,13 +12,21 @@ const app = express();
 const port = process.env.PORT || 3001;
 
 // Middlewares
-app.use(cors());
+app.use(cors({
+  origin: 'http://localhost:3000',
+  methods: ['GET', 'POST', 'PUT', 'DELETE'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
 
 // Rotas
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
+
+// Rotas de competência
+app.use('/api/auth', authRoutes);
+app.use('/api/competencies', competencyRoutes);
 
 // Inicializar conexão com o banco de dados
 AppDataSource.initialize()
