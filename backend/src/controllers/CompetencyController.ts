@@ -46,8 +46,11 @@ export class CompetencyController {
         return res.status(400).json({ message: "Invalid competency ID" });
       }
 
+      // Buscar questões do banco relacional (PostgreSQL)
       const result = await this.questionService.getQuestionsForCompetency(studentId, competencyIdNumber);
-      console.log('Questões encontradas:', result);
+      if (!result.questions.length) {
+        return res.status(404).json({ message: "Nenhuma questão encontrada para a competência informada." });
+      }
       return res.json(result);
     } catch (error) {
       console.error("Erro detalhado ao buscar questões:", error);

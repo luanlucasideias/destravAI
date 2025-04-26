@@ -360,8 +360,8 @@ export default function QuestoesDiarias() {
       <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur">
         <div className="container flex h-16 items-center justify-between">
           <div className="flex items-center gap-2 font-bold text-xl">
-            <Link href="/" className="text-primary">
-              Destrav.ai
+            <Link href="/">
+              <img src="/assets/logo_destravai.png" alt="Logo Destrav.ai" className="h-10 w-auto" />
             </Link>
           </div>
           <nav className="hidden md:flex gap-6">
