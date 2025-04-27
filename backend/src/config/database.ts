@@ -1,5 +1,5 @@
 import { DataSource } from "typeorm";
-import dotenv from "dotenv";
+import * as dotenv from "dotenv";
 import { User } from "../entities/User";
 import { CompetencyMetadata } from "../entities/CompetencyMetadata";
 import { StudentCompetencyProgress } from "../entities/StudentCompetencyProgress";
