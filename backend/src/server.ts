@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 import { AppDataSource } from './config/database';
 import competencyRoutes from './routes/competencyRoutes';
 import authRoutes from './routes/authRoutes';
+import { connectToDatabase } from './config/lib/mongodb/database';
 
 dotenv.config();
 
@@ -41,3 +42,9 @@ AppDataSource.initialize()
   .catch((error) => {
     console.error("Erro ao conectar com o banco de dados:", error);
   }); 
+
+/* (async () => {
+  const db = await connectToDatabase();
+  const users = await db.collection('questions_2009').find().toArray();
+  console.log(users);
+})(); */
