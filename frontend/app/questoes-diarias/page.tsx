@@ -41,16 +41,28 @@ import {
 } from "@/components/ui/alert-dialog"
 import { LogOut, Settings, User } from "lucide-react"
 
-interface Question {
-  id: number;
-  competencyId: number;
+interface Alternative {
+  letter: string;
   text: string;
-  options: string[];
-  correctAnswer: string;
-  difficulty: number;
-  competencyDescription: string;
-  subjectCode: string;
-  topicCode: string;
+  file: string | null;
+  isCorrect: boolean;
+}
+
+interface Question {
+  _id: string;
+  question: {
+    title: string;
+    index: number;
+    year: number;
+    language: string | null;
+    discipline: string;
+    context: string;
+    files: string[];
+    correctAlternative: string;
+    alternativesIntroduction: string;
+    alternatives: Alternative[];
+  };
+  competency_id: number;
 }
 
 interface Competency {
@@ -252,29 +264,22 @@ export default function QuestoesDiarias() {
   // Buscar questões da competência
   const fetchQuestions = async (competencyId: number) => {
     try {
-      console.log('Buscando questões para competência:', competencyId);
-      const response = await fetch(
-        `http://localhost:3001/api/competencies/student/123e4567-e89b-12d3-a456-426614174000/competencies/${competencyId}/questions`
-      );
-      const data = await response.json();
-      console.log('Questões recebidas do backend:', data);
-      
-      // Atualizar informações da competência
-      setCurrentCompetency({
-        id: data.competencyInfo.id,
-        name: data.competencyInfo.description,
-        description: `${data.competencyInfo.subjectCode} - ${data.competencyInfo.topicCode}`
-      });
-      
-      setCurrentQuestions(data.questions);
+      const response = await fetch(`http://localhost:3001/api/competencies/student/123e4567-e89b-12d3-a456-426614174000/competencies/${competencyId}/
+        questions`);
+      if (!response.ok) {
+        throw new Error('Erro ao buscar questões');
+      }
+      const questions = await response.json();
+      console.log('Questões recebidas:', questions);
+      setCurrentQuestions(questions);
       setCurrentQuestionIndex(0);
-      setQuestaoRespondida(false);
       setAlternativaSelecionada(null);
-      setSessionId(data.sessionId || null);
-      setRespostasBloco([]);
+      setQuestaoRespondida(false);
+      setIsLoading(false);
     } catch (err) {
+      console.error('Erro ao buscar questões:', err);
       setError('Erro ao buscar questões');
-      console.error('Erro detalhado ao buscar questões:', err);
+      setIsLoading(false);
     }
   };
 
@@ -284,7 +289,7 @@ export default function QuestoesDiarias() {
     // Armazenar resposta localmente
     setRespostasBloco(prev => [
       ...prev,
-      { questionId: currentQuestions[currentQuestionIndex].id, answer }
+      { questionId: currentQuestions[currentQuestionIndex].question.index, answer }
     ]);
     // Verificar se é a última questão do bloco
     if (currentQuestionIndex === currentQuestions.length - 1) {
@@ -298,7 +303,7 @@ export default function QuestoesDiarias() {
               'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-              answers: [...respostasBloco, { questionId: currentQuestions[currentQuestionIndex].id, answer }],
+              answers: [...respostasBloco, { questionId: currentQuestions[currentQuestionIndex].question.index, answer }],
               sessionId
             })
           }
@@ -496,47 +501,59 @@ export default function QuestoesDiarias() {
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="bg-primary/10 text-primary font-medium text-sm px-3 py-1 rounded-full">
-                        {currentCompetency?.description}
+                        {currentQuestion.question.discipline}
                       </div>
-                      <div className="text-sm text-muted-foreground">{currentCompetency?.name}</div>
+                      <div className="text-sm text-muted-foreground">
+                        {currentQuestion.question.title}
+                      </div>
                     </div>
                     <div className="flex items-center gap-1 text-sm text-muted-foreground">
                       <HelpCircle className="h-4 w-4" />
-                      <span>Dificuldade: {currentQuestion?.difficulty === 1 ? 'Fácil' : currentQuestion?.difficulty === 2 ? 'Média' : 'Difícil'}</span>
+                      <span>Ano: {currentQuestion.question.year}</span>
                     </div>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="text-base">
-                    <p>
-                      {currentQuestion.text}
-                    </p>
-                  </div>
+                  {currentQuestion.question.context && (
+                    <div className="text-base">
+                      <p>{currentQuestion.question.context}</p>
+                    </div>
+                  )}
+
+                  {currentQuestion.question.alternativesIntroduction && (
+                    <div className="font-medium mt-4">
+                      {currentQuestion.question.alternativesIntroduction}
+                    </div>
+                  )}
 
                   <RadioGroup
-                    className="space-y-3"
+                    className="space-y-3 mt-4"
                     value={alternativaSelecionada || ""}
                     onValueChange={setAlternativaSelecionada}
                     disabled={questaoRespondida}
                   >
-                    {currentQuestion.options.map((option, index) => (
+                    {currentQuestion.question.alternatives.map((alt) => (
                       <div
-                        key={index}
+                        key={alt.letter}
                         className={`flex items-center space-x-2 rounded-lg border p-4 hover:bg-muted/50 ${
                           questaoRespondida &&
-                          alternativaSelecionada === option
-                            ? "bg-green-50 border-green-300"
+                          alternativaSelecionada === alt.letter
+                            ? alt.isCorrect 
+                              ? "bg-green-50 border-green-300"
+                              : "bg-red-50 border-red-300"
                             : ""
                         }`}
                       >
-                        <RadioGroupItem value={option} id={`option-${index}`} disabled={questaoRespondida} />
+                        <RadioGroupItem value={alt.letter} id={alt.letter} disabled={questaoRespondida} />
                         <Label
-                          htmlFor={`option-${index}`}
+                          htmlFor={alt.letter}
                           className={`flex-1 cursor-pointer ${
-                            questaoRespondida && alternativaSelecionada === option ? "font-medium text-green-700" : ""
+                            questaoRespondida && alternativaSelecionada === alt.letter 
+                              ? alt.isCorrect ? "font-medium text-green-700" : "font-medium text-red-700"
+                              : ""
                           }`}
                         >
-                          {option}
+                          {alt.text}
                         </Label>
                       </div>
                     ))}
@@ -544,12 +561,24 @@ export default function QuestoesDiarias() {
 
                   {questaoRespondida && (
                     <div
-                      className={`mt-4 p-4 rounded-lg ${alternativaSelecionada === currentQuestion.correctAnswer ? "bg-green-50 border border-green-200" : "bg-red-50 border border-red-200"}`}
+                      className={`mt-4 p-4 rounded-lg ${
+                        alternativaSelecionada === currentQuestion.question.correctAlternative
+                          ? "bg-green-50 border border-green-200"
+                          : "bg-red-50 border border-red-200"
+                      }`}
                     >
-                      <div className={`font-medium ${alternativaSelecionada === currentQuestion.correctAnswer ? "text-green-700" : "text-red-700"}`}>
-                        {alternativaSelecionada === currentQuestion.correctAnswer ? "Parabéns! Você acertou." : "Você errou. A resposta correta é: " + currentQuestion.correctAnswer}
+                      <div
+                        className={`font-medium ${
+                          alternativaSelecionada === currentQuestion.question.correctAlternative
+                            ? "text-green-700"
+                            : "text-red-700"
+                        }`}
+                      >
+                        {alternativaSelecionada === currentQuestion.question.correctAlternative
+                          ? "Parabéns! Você acertou."
+                          : `Você errou. A resposta correta é: ${currentQuestion.question.correctAlternative}`}
                       </div>
-                      {alternativaSelecionada !== currentQuestion.correctAnswer && (
+                      {alternativaSelecionada !== currentQuestion.question.correctAlternative && (
                         <Button 
                           variant="outline" 
                           className="mt-2"
@@ -560,36 +589,6 @@ export default function QuestoesDiarias() {
                       )}
                     </div>
                   )}
-
-                  <Dialog open={showResolucao} onOpenChange={setShowResolucao}>
-                    <DialogContent className="max-w-3xl">
-                      <DialogHeader>
-                        <DialogTitle className="flex items-center justify-between">
-                          <span>Resolução da questão</span>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            onClick={() => setShowResolucao(false)}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </DialogTitle>
-                      </DialogHeader>
-                      <div className="aspect-video">
-                        <YouTube
-                          videoId="o1Z9QGmHGqQ"
-                          opts={{
-                            playerVars: {
-                              autoplay: 0,
-                              controls: 1,
-                              modestbranding: 1,
-                            },
-                          }}
-                          className="w-full h-full"
-                        />
-                      </div>
-                    </DialogContent>
-                  </Dialog>
                 </CardContent>
                 <CardFooter className="flex justify-between">
                   <Button variant="outline">

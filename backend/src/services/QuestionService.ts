@@ -2,11 +2,17 @@ import { AppDataSource } from "../config/database";
 import { Question } from "../entities/Question";
 import { StudentCompetencyProgress } from "../entities/StudentCompetencyProgress";
 import { StudentQuestionSession } from "../entities/StudentQuestionSession";
+import { QuestionRepository } from "../repository/mongo/questions";
 
 export class QuestionService {
-  private questionRepository = AppDataSource.getRepository(Question);
   private progressRepository = AppDataSource.getRepository(StudentCompetencyProgress);
   private sessionRepository = AppDataSource.getRepository(StudentQuestionSession);
+
+  async getQuestionByCompetencyIdFromMongoDB(competencyId: number) {
+    const questionRepository = new QuestionRepository();
+    const question = await questionRepository.findByCompetencyId(competencyId);
+    return question;
+  }
 
   async getQuestionsForCompetency(studentId: string, competencyId: number) {
     console.log(`Iniciando busca de questões para estudante ${studentId} e competência ${competencyId}`);

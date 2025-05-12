@@ -47,8 +47,11 @@ export class CompetencyController {
       }
 
       // Buscar questões do banco relacional (PostgreSQL) e criar sessão
-      const result = await this.questionService.getQuestionsForCompetency(studentId, competencyIdNumber);
-      if (!result.questions.length) {
+      //const result = await this.questionService.getQuestionsForCompetency(studentId, competencyIdNumber);
+      
+      const result = await this.questionService.getQuestionByCompetencyIdFromMongoDB(competencyIdNumber);
+      
+      if (!result) {
         return res.status(404).json({ message: "Nenhuma questão encontrada para a competência informada." });
       }
       return res.json(result);
